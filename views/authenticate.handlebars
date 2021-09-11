@@ -1,0 +1,15 @@
+<p>{{username}}</p>
+<p>
+  <b>
+    {{clientName}}
+  </b>
+  is requesting access to your account.</p>
+<p>Do you approve?</p>
+
+<form action="/oauth2/authorize" method="post">
+  <input name="transaction_id" type="hidden" value="{{transactionId}}" />
+  <div class="form-group">
+    <input type="submit" class="btn btn-secondary" value="Deny" name="cancel" id="deny" />
+    <input type="submit" class="btn btn-warning" value="Allow" id="allow" />
+  </div>
+</form>
