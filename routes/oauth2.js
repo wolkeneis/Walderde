@@ -40,10 +40,6 @@ router.post('/authorize',
   server.decision());
 
 router.post('/token',
-  (req, res, next) => {
-    console.log(req.body);
-    return next();
-  },
   passport.authenticate(['basic', 'oauth2-client-password'], { session: false }),
   server.token(),
   server.errorHandler());
