@@ -3,7 +3,6 @@
 require('dotenv').config();
 
 const express = require('express'),
-  exphbs = require('express-handlebars'),
   cors = require('cors'),
   session = require('express-session'),
   RedisStore = require('connect-redis')(session),
@@ -13,9 +12,6 @@ const express = require('express'),
 const database = require('./database');
 
 const app = express();
-
-app.engine('handlebars', exphbs({ defaultLayout: 'default' }));
-app.set('view engine', 'handlebars');
 
 app.use(cors({
   origin: process.env.CONTROL_ORIGIN,
@@ -43,9 +39,9 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-const { account, login, oauth2, api } = require('./routes');
+const { profile, login, oauth2, api } = require('./routes');
 
-app.use('/account', account);
+app.use('/profile', profile);
 app.use('/login', login);
 app.use('/oauth2', oauth2);
 app.use('/api', api);
@@ -53,7 +49,5 @@ app.use('/api', api);
 app.get('/', (req, res) => {
   res.sendStatus(200);
 });
-
-app.listen(process.env.PORT || 4000);
 
 module.exports = app;

@@ -1,12 +1,12 @@
 'use strict';
 
-const account = require('./account');
+const profile = require('./profile');
 const login = require('./login');
 const oauth2 = require('./oauth2');
 const api = require('./api');
 
 module.exports = {
-  account,
+  profile,
   login,
   oauth2,
   api

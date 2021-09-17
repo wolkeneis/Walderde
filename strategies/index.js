@@ -62,7 +62,7 @@ passport.use(new DiscordStrategy({
     provider: profile.provider,
     providerId: profile.id,
     username: profile.username + '#' + profile.discriminator,
-    avatar: `https://cdn.discordapp.com/avatars/${req.user.id}/${profile.avatar}.png`,
+    avatar: `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`,
     accessToken: accessToken,
     refreshToken: refreshToken
   }, (error, user) => {

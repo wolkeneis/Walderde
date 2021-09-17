@@ -76,6 +76,7 @@ function createProfile(profile, done) {
     'userId', userId,
     'username', profile.username,
     'avatar', profile.avatar,
+    'provider', profile.provider,
     'accessToken', profile.accessToken
   ];
   if (profile.refreshToken) {
@@ -157,6 +158,7 @@ function createProviderProfile(profile, done) {
     'userId', profile.user.id,
     'username', profile.username,
     'avatar', profile.avatar,
+    'provider', profile.provider,
     'accessToken', profile.accessToken
   ];
   if (profile.refreshToken) {
@@ -171,6 +173,44 @@ function createProviderProfile(profile, done) {
       }
       return done(null, profile.user);
     });
+}
+
+function userFetchConnections(userId, done) {
+  redisClient.smembers('connections:' + userId, (error, connections) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    if (!connections) {
+      return done(new Error('Database error'));
+    }
+    const multi = redisClient.multi();
+    for (const connection of connections) {
+      multi.hgetall(connection);
+    }
+    multi.exec((error, providerProfiles) => {
+      if (error) {
+        console.error(error);
+        return done(new Error('Database error'));
+      }
+      if (!providerProfiles) {
+        return done(new Error('Database error'));
+      }
+      const profiles = [];
+      for (const providerProfile of providerProfiles) {
+        if (providerProfile.userId === userId) {
+          profiles.push({
+            username: providerProfile.username,
+            avatar: providerProfile.avatar,
+            provider: providerProfile.provider
+          });
+        } else {
+          return done(new Error('Database error'));
+        }
+      }
+      return done(null, profiles);
+    });
+  });
 }
 
 function authorizationCodeFind(code, done) {
@@ -362,6 +402,7 @@ module.exports = {
   users: {
     byId: userById,
     findOrCreate: userFindOrCreate,
+    fetchConnections: userFetchConnections
   },
   authorizationCodes: {
     find: authorizationCodeFind,

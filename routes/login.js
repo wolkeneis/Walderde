@@ -8,18 +8,18 @@ require('../strategies');
 const router = express.Router();
 
 router.get('/', (req, res) => {
-  res.sendStatus(200);
+  res.redirect(process.env.CONTROL_ORIGIN + '/redirect/profile');
 });
 
 router.get('/discord', passport.authenticate('discord'));
 router.get('/discord/callback', passport.authenticate('discord', {
-  successReturnToOrRedirect: '/',
+  successReturnToOrRedirect: '/profile',
   failureRedirect: "/login"
 }));
 
 router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
 router.get('/github/callback', passport.authenticate('github', {
-  successReturnToOrRedirect: '/',
+  successReturnToOrRedirect: '/profile',
   failureRedirect: "/login",
 }));
 

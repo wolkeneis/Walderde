@@ -28,11 +28,7 @@ router.get('/authorize',
     });
   }),
   (req, res) => {
-    res.render('authenticate', {
-      transactionId: req.oauth2.transactionID,
-      username: req.user.username,
-      clientName: req.oauth2.client.name
-    });
+    res.redirect(process.env.CONTROL_ORIGIN + `/redirect/authorize?transactionId=${encodeURIComponent(req.oauth2.transactionID)}&username=${encodeURIComponent(req.user.username)}&client=${encodeURIComponent(req.oauth2.client.name)}`);
   });
 
 router.post('/authorize',
