@@ -13,6 +13,8 @@ const database = require('./database');
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 app.use(cors({
   origin: process.env.CONTROL_ORIGIN,
   allowedHeaders: 'X-Requested-With, Content-Type',
