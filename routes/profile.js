@@ -28,7 +28,7 @@ router.post('/connections',
   ensureLoggedIn('/login'),
   (req, res) => {
     const user = req.user;
-    database.users.fetchConnections(req.user.id, (error, connections) => {
+    database.users.fetchConnections(user.id, (error, connections) => {
       if (error) {
         return res.sendStatus(500);
       }

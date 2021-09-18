@@ -25,9 +25,9 @@ function issueTokens(clientId, userId, done) {
     if (error) return done(error);
     const accessToken = randomToken(256);
     const refreshToken = randomToken(256);
-    database.accessTokens.save(accessToken, userId, clientId, (error) => {
+    database.accessTokens.save(accessToken, user.id, clientId, (error) => {
       if (error) return done(error);
-      database.refreshTokens.save(refreshToken, userId, clientId, (error) => {
+      database.refreshTokens.save(refreshToken, user.id, clientId, (error) => {
         if (error) return done(error);
         return done(null, accessToken, refreshToken);
       });
