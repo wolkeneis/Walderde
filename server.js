@@ -1,5 +1,7 @@
 'use strict';
 
-var app = require('./app.js');
+const app = require('./app.js'),
+  { initalize } = require('./socket.io');
 
-app.listen(process.env.PORT || 4000);
+const server = app.listen(process.env.PORT || 4000);
+initalize(server);
