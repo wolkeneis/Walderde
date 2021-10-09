@@ -1,12 +1,18 @@
 'use strict';
 
-const { Server } = require('socket.io');
+const { Server } = require('socket.io'),
+  { sessionMiddleware, passportMiddleware, passportSessionMiddleware } = require('../app');
 
 const rooms = {};
 
+const wrapMiddleware = middleware => (socket, next) => middleware(socket.request, {}, next);
+
 function initalize(server) {
   if (!server) {
-    throw new Error('socket.io needs a valid http.Server, https.Server, http2.Server object');
+    throw new Error('socket.io needs a valid http.Server, https.Server or http2.Server object');
+  }
+  if (!sessionMiddleware) {
+    throw new Error('socket.io needs a valid session middleware');
   }
   const whitelist = [
     process.env.CONTROL_ORIGIN ?? 'https://eiswald.wolkeneis.dev',
@@ -27,11 +33,20 @@ function initalize(server) {
     }
   });
 
-  io.sockets.on('connection', socket => {
-    console.log(`${socket.id}, connected`);
+  io.use(wrapMiddleware(sessionMiddleware));
+  io.use(wrapMiddleware(passportMiddleware));
+  io.use(wrapMiddleware(passportSessionMiddleware));
+
+  io.on('connection', socket => {
+    const user = socket.request.user;
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`${user ? user.username : socket.id} connected`);
+    }
 
     socket.on('disconnect', socket => {
-      console.log(`${socket.id}, disconnected`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`${user ? user.username : socket.id} disconnected`);
+      }
     });
 
     socket.on('room create', (data, callback) => {
@@ -85,6 +100,7 @@ function initalize(server) {
 }
 
 function createRoom(roomId, socket, options) {
+  const user = socket.request.user;
   socket.join(roomId);
   socket.roomId = roomId;
   const room = {
@@ -101,7 +117,7 @@ function createRoom(roomId, socket, options) {
   }
   room.sockets[socket.id] = socket;
   room.users[socket.id] = {
-    name: 'name_' + Math.random().toString(36).substr(2, 12),
+    name: user ? user.username : 'name_' + Math.random().toString(36).substr(2, 12),
     id: socket.id,
     host: true
   }
@@ -110,12 +126,13 @@ function createRoom(roomId, socket, options) {
 }
 
 function joinRoom(roomId, socket) {
+  const user = socket.request.user;
   socket.join(roomId);
   socket.roomId = roomId;
   const room = rooms[roomId];
   room.sockets[socket.id] = socket;
   room.users[socket.id] = {
-    name: 'name_' + Math.random().toString(36).substr(2, 12),
+    name: user ? user.username : 'name_' + Math.random().toString(36).substr(2, 12),
     id: socket.id,
     host: false
   }

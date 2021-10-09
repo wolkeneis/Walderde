@@ -15,6 +15,27 @@ const app = express();
 
 app.set('trust proxy', 1);
 
+const sessionMiddleware = session({
+  store: new RedisStore({
+    client: database.redisClient,
+    prefix: 'sessions:',
+    disableTouch: false
+  }),
+  secret: process.env.SECRET,
+  resave: true,
+  saveUninitialized: true,
+  cookie: {
+    path: '/',
+    sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax',
+    httpOnly: true,
+    secure: process.env.NODE_ENV !== 'development',
+    maxAge: 604800000
+  }
+});
+
+const passportMiddleware = passport.initialize();
+const passportSessionMiddleware = passport.session();
+
 const whitelist = [
   process.env.CONTROL_ORIGIN ?? 'https://eiswald.wolkeneis.dev',
   process.env.CONTROL_ORIGIN_ELECTRON ?? 'eiswald://-',
@@ -33,26 +54,11 @@ app.use(cors({
   allowedHeaders: 'X-Requested-With, Content-Type',
   credentials: true
 }));
+app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(session({
-  store: new RedisStore({
-    client: database.redisClient,
-    prefix: 'sessions:',
-    disableTouch: false
-  }),
-  secret: process.env.SECRET,
-  resave: true,
-  saveUninitialized: true,
-  cookie: {
-    path: '/',
-    sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax',
-    httpOnly: true,
-    secure: process.env.NODE_ENV !== 'development',
-    maxAge: 604800000
-  }
-}));
-app.use(passport.initialize());
-app.use(passport.session());
+app.use(sessionMiddleware);
+app.use(passportMiddleware);
+app.use(passportSessionMiddleware);
 
 const { profile, login, oauth2, api } = require('./routes');
 
@@ -65,4 +71,4 @@ app.get('/', (req, res) => {
   res.sendStatus(200);
 });
 
-module.exports = app;
+module.exports = { app, sessionMiddleware, passportMiddleware, passportSessionMiddleware };
