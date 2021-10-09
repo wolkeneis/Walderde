@@ -8,9 +8,21 @@ function initalize(server) {
   if (!server) {
     throw new Error('socket.io needs a valid http.Server, https.Server, http2.Server object');
   }
+  const whitelist = [
+    process.env.CONTROL_ORIGIN ?? 'https://eiswald.wolkeneis.dev',
+    process.env.CONTROL_ORIGIN_ELECTRON ?? 'eiswald://-',
+    process.env.CONTROL_ORIGIN_IOS ?? 'capacitor://localhost',
+    process.env.CONTROL_ORIGIN_ANDROID ?? 'http://localhost'
+  ];
   const io = new Server(server, {
     cors: {
-      origin: process.env.CONTROL_ORIGIN,
+      origin: (origin, callback) => {
+        if (!origin || whitelist.indexOf(origin) !== -1) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS: ' + origin));
+        }
+      },
       credentials: true
     }
   });
