@@ -1,6 +1,9 @@
 'use strict';
 
 const { Server } = require('socket.io'),
+  uuid = require('uuid');
+
+const database = require('../database'),
   { sessionMiddleware, passportMiddleware, passportSessionMiddleware } = require('../app');
 
 const rooms = {};
@@ -31,6 +34,88 @@ function initalize(server) {
       },
       credentials: true
     }
+  });
+
+  const chat = io.of('/chat');
+  chat.use(wrapMiddleware(sessionMiddleware));
+  chat.use(wrapMiddleware(passportMiddleware));
+  chat.use(wrapMiddleware(passportSessionMiddleware));
+
+  chat.on('connection', socket => {
+    const user = socket.request.user;
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`${user ? user.username : socket.id} connected`);
+    }
+
+    if (user) {
+      socket.join(user.id);
+    }
+
+    socket.on('disconnect', socket => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`${user ? user.username : socket.id} disconnected`);
+      }
+    });
+
+    socket.on('packet', (data, callback) => {
+      if (callback) {
+        if (!user || !data || !data.receiver || !uuid.validate(data.receiver)) {
+          return callback();
+        }
+        database.users.byId(data.receiver, (error, contact) => {
+          if (error) {
+            return callback();
+          }
+          if (contact.private === 'true') {
+            database.users.isContact(data.receiver, user.id, (error, isContact) => {
+              if (error) {
+                return callback();
+              }
+              if (isContact) {
+                database.chat.storePacket(user.id, data, (error, packet) => {
+                  if (error) {
+                    return callback();
+                  }
+                  if (packet.receiver && uuid.validate(packet.receiver) /* && packet.receiver.allowsMessagesFrom(user.id) */) {
+                    chat.in(packet.receiver).emit('packet', packet);
+                  }
+                  return callback(packet);
+                });
+              } else {
+                return callback();
+              }
+            });
+          } else {
+            database.chat.storePacket(user.id, data, (error, packet) => {
+              if (error) {
+                return callback();
+              }
+              if (packet.receiver && uuid.validate(packet.receiver)) {
+                chat.in(packet.receiver).emit('packet', packet);
+              }
+              return callback(packet);
+            });
+          }
+        });
+      }
+    });
+
+    socket.on('packets', (data, callback) => {
+      if (callback) {
+        if (!user) {
+          return callback();
+        }
+        if (data) {
+          database.chat.fetchPackets(user.id, data.start, data.range, (error, packets) => {
+            return callback(error ? undefined : packets);
+          });
+        } else {
+          database.chat.fetchPackets(user.id, undefined, undefined, (error, packets) => {
+            return callback(error ? undefined : packets);
+          });
+        }
+      }
+    });
   });
 
   io.use(wrapMiddleware(sessionMiddleware));

@@ -175,6 +175,64 @@ function createProviderProfile(profile, done) {
     });
 }
 
+function userChangePrivacy(userId, privateProfile, done) {
+  redisClient.hset('user:' + userId, [
+    'private', privateProfile
+  ], (error) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database Error'));
+    }
+    return done(null, privateProfile);
+  });
+}
+
+function userFetchContacts(userId, done) {
+  redisClient.smembers('contacts:' + userId, (error, contacts) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    return done(null, contacts);
+  });
+}
+
+function userAddContact(userId, contactId, done) {
+  redisClient.sadd('contacts:' + userId, contactId, (error, reply) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    if (!reply) {
+      return done(new Error('Database error'));
+    }
+    return done();
+  });
+}
+
+function userIsContact(userId, contactId, done) {
+  redisClient.sismember('contacts:' + userId, contactId, (error, isContact) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    return done(null, isContact ? true : false);
+  });
+}
+
+function userRemoveContact(userId, contactId, done) {
+  redisClient.srem('contacts:' + userId, contactId, (error, reply) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    if (!reply) {
+      return done(new Error('Database error'));
+    }
+    return done();
+  });
+}
+
 function userFetchConnections(userId, done) {
   redisClient.smembers('connections:' + userId, (error, connections) => {
     if (error) {
@@ -211,6 +269,142 @@ function userFetchConnections(userId, done) {
       return done(null, profiles);
     });
   });
+}
+
+function chatFetchPackets(userId, start, range, done) {
+  if (start !== undefined && range !== undefined) {
+    if (range > 50) {
+      return done(new Error('Invalid Range'));
+    }
+    return fetchPacketRange(userId, start, range, done);
+  } else {
+    return fetchRecentPackets(userId, done);
+  }
+}
+
+function fetchPacketRange(userId, start, range, done) {
+  redisClient.lrange('packets:' + userId, start, start + range, (error, packetIds) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    if (!packetIds) {
+      console.error(error);
+      return done(new Error('No Packets found'));
+    }
+    const multi = redisClient.multi();
+    for (const packetId of packetIds) {
+      multi.hgetall('packet:' + packetId)
+    }
+    multi.exec((error, packets) => {
+      if (error) {
+        console.error(error);
+        return done(new Error('Database error'));
+      }
+      if (!packets) {
+        return done(new Error('Database error'));
+      }
+      return done(null, packets);
+    });
+  });
+}
+
+function fetchRecentPackets(userId, done) {
+  redisClient.lrange('recentPackets:' + userId, 0, -1, (error, packetIds) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    if (!packetIds) {
+      console.error(error);
+      return done(new Error('No Packets found'));
+    }
+    const multi = redisClient.multi();
+    for (const packetId of packetIds) {
+      multi.hgetall('packet:' + packetId)
+    }
+    multi.exec((error, packets) => {
+      if (error) {
+        console.error(error);
+        return done(new Error('Database error'));
+      }
+      if (!packets) {
+        return done(new Error('Database error'));
+      }
+      return done(null, packets);
+    });
+  });
+}
+
+function chatStorePacket(userId, packet, done) {
+  if (!packet.receiver || !uuid.validate(packet.receiver) || !packet.content || packet.content.length >= 5000) {
+    return done(new Error('Invalid Packet'));
+  }
+  const packetId = uuid.v4();
+  redisClient.multi()
+    .hset('packet:' + packetId, [
+      'packetId', packetId,
+      'sender', userId,
+      'receiver', packet.receiver,
+      'content', packet.content
+    ]).lpush('recentPackets:' + userId, packetId)
+    .lpush('recentPackets:' + packet.receiver, packetId).exec((error, reply) => {
+      if (error) {
+        console.error(error);
+        return done(new Error('Database error'));
+      }
+      if (reply[1] > 50) {
+        redisClient.rpoplpush('recentPackets:' + userId, 'packets:' + userId, (error) => {
+          if (error) {
+            return done(new Error('Database error'));
+          }
+        });
+      }
+      if (reply[2] > 50) {
+        redisClient.rpoplpush('recentPackets:' + packet.receiver, 'packets:' + packet.receiver, (error) => {
+          if (error) {
+            return done(new Error('Database error'));
+          }
+        });
+      }
+      return done(null, {
+        packetId: packetId,
+        sender: userId,
+        receiver: packet.receiver,
+        content: packet.content
+      });
+    });
+}
+
+function keyPairFind(userId, done) {
+  redisClient.hgetall('keyPair:' + userId, (error, keyPair) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    return done(null, keyPair);
+  });
+}
+
+function keyPairSave(userId, keyPair, done) {
+  if (keyPair.iv > 64 || keyPair.salt > 512 || keyPair.privateKey > 128 || keyPair.publicKey > 64) {
+    return done(new Error('Invalid Key Pair'));
+  }
+  redisClient.multi().hset('keyPair:' + userId, [
+    'iv', keyPair.iv,
+    'salt', keyPair.salt,
+    'privateKey', keyPair.privateKey,
+    'publicKey', keyPair.publicKey
+  ])
+    .hset('user:' + userId, [
+      'publicKey', keyPair.publicKey
+    ]).exec((error) => {
+      if (error) {
+        console.error(error);
+        return done(new Error('Database error'));
+      }
+      return done();
+    });
 }
 
 function authorizationCodeFind(code, done) {
@@ -402,7 +596,20 @@ module.exports = {
   users: {
     byId: userById,
     findOrCreate: userFindOrCreate,
-    fetchConnections: userFetchConnections
+    changePrivacy: userChangePrivacy,
+    fetchConnections: userFetchConnections,
+    fetchContacts: userFetchContacts,
+    addContact: userAddContact,
+    isContact: userIsContact,
+    removeContact: userRemoveContact
+  },
+  chat: {
+    fetchPackets: chatFetchPackets,
+    storePacket: chatStorePacket
+  },
+  keyPairs: {
+    find: keyPairFind,
+    save: keyPairSave
   },
   authorizationCodes: {
     find: authorizationCodeFind,
