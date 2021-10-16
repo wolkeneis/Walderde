@@ -20,14 +20,14 @@ if (process.env.REDIS_TLS_URL || process.env.REDIS_URL) {
       tls: {
         rejectUnauthorized: process.env.REDIS_SELF_SIGNED !== 'true'
       },
-      db: 1
+      db: (process.env.REDIS_DATABASES && process.env.REDIS_DATABASES !== 'min') ? 1 : 0
     });
 } else {
   redisClient = redis.createClient({
     host: process.env.REDIS_HOST ?? "localhost",
     port: process.env.REDIS_PORT ?? 6379,
     password: process.env.REDIS_KEY,
-    db: 1
+    db: (process.env.REDIS_DATABASES && process.env.REDIS_DATABASES !== 'min') ? 1 : 0
   });
 }
 redisClient.on('error', console.error);

@@ -37,9 +37,10 @@ function isValidUrl(string) {
   return url.protocol === "http:" || url.protocol === "https:";
 }
 
-function wrapCall(func, database) {
+function wrapCall(func, database, fallbackDatabase) {
+  
   return (...args) => {
-    redisClient.select(database, (error) => {
+    redisClient.select(process.env.REDIS_DATABASES ? (process.env.REDIS_DATABASES !== 'min' ? (process.env.REDIS_DATABASES === 'max' ? database : fallbackDatabase) : 0) : 0, (error) => {
       if (error) {
         console.error(error);
         throw new Error('Database error');
@@ -753,46 +754,46 @@ function refreshTokenRemoveByIds(refreshToken, userId, clientId, done) {
 module.exports = {
   redisClient: redisClient,
   clients: {
-    byId: wrapCall(clientById, 4),
-    fetch: wrapCall(clientsFetch, 4),
-    create: wrapCall(clientCreate, 4),
-    updateName: wrapCall(clientUpdateName, 4),
-    updateRedirectUri: wrapCall(clientUpdateRedirectUri, 4),
-    regenerateSecret: wrapCall(clientRegenerateSecret, 4),
-    checkSecret: wrapCall(clientCheckSecret, 4)
+    byId: wrapCall(clientById, 4, 0),
+    fetch: wrapCall(clientsFetch, 4, 0),
+    create: wrapCall(clientCreate, 4, 0),
+    updateName: wrapCall(clientUpdateName, 4, 0),
+    updateRedirectUri: wrapCall(clientUpdateRedirectUri, 4, 0),
+    regenerateSecret: wrapCall(clientRegenerateSecret, 4, 0),
+    checkSecret: wrapCall(clientCheckSecret, 4, 0)
   },
   users: {
-    byId: wrapCall(userById, 0),
-    findOrCreate: wrapCall(userFindOrCreate, 0),
-    changePrivacy: wrapCall(userChangePrivacy, 0),
-    fetchConnections: wrapCall(userFetchConnections, 0),
-    fetchContacts: wrapCall(userFetchContacts, 0),
-    addContact: wrapCall(userAddContact, 0),
-    isContact: wrapCall(userIsContact, 0),
-    removeContact: wrapCall(userRemoveContact, 0)
+    byId: wrapCall(userById, 0, 0),
+    findOrCreate: wrapCall(userFindOrCreate, 0, 0),
+    changePrivacy: wrapCall(userChangePrivacy, 0, 0),
+    fetchConnections: wrapCall(userFetchConnections, 0, 0),
+    fetchContacts: wrapCall(userFetchContacts, 0, 0),
+    addContact: wrapCall(userAddContact, 0, 0),
+    isContact: wrapCall(userIsContact, 0, 0),
+    removeContact: wrapCall(userRemoveContact, 0, 0)
   },
   chat: {
-    fetchPackets: wrapCall(chatFetchPackets, 3),
-    storePacket: wrapCall(chatStorePacket, 3)
+    fetchPackets: wrapCall(chatFetchPackets, 3, 1),
+    storePacket: wrapCall(chatStorePacket, 3, 1)
   },
   keyPairs: {
-    find: wrapCall(keyPairFind, 0),
-    save: wrapCall(keyPairSave, 0)
+    find: wrapCall(keyPairFind, 0, 0),
+    save: wrapCall(keyPairSave, 0, 0)
   },
   authorizationCodes: {
-    find: wrapCall(authorizationCodeFind, 2),
-    save: wrapCall(authorizationCodeSave, 2)
+    find: wrapCall(authorizationCodeFind, 2, 1),
+    save: wrapCall(authorizationCodeSave, 2, 1)
   },
   accessTokens: {
-    find: wrapCall(accessTokenFind, 2),
-    findByIds: wrapCall(accessTokenFindByIds, 2),
-    save: wrapCall(accessTokenSave, 2),
-    removeByIds: wrapCall(accessTokenRemoveByIds, 2)
+    find: wrapCall(accessTokenFind, 2, 1),
+    findByIds: wrapCall(accessTokenFindByIds, 2, 1),
+    save: wrapCall(accessTokenSave, 2, 1),
+    removeByIds: wrapCall(accessTokenRemoveByIds, 2, 1)
   },
   refreshTokens: {
-    find: wrapCall(refreshTokenFind, 2),
-    findByIds: wrapCall(refreshTokenFindByIds, 2),
-    save: wrapCall(refreshTokenSave, 2),
-    removeByIds: wrapCall(refreshTokenRemoveByIds, 2)
+    find: wrapCall(refreshTokenFind, 2, 1),
+    findByIds: wrapCall(refreshTokenFindByIds, 2, 1),
+    save: wrapCall(refreshTokenSave, 2, 1),
+    removeByIds: wrapCall(refreshTokenRemoveByIds, 2, 1)
   }
 };
