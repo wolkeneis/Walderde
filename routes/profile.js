@@ -140,6 +140,18 @@ router.post('/connections',
     });
   });
 
+router.get('/clients',
+  ensureLoggedIn('/login'),
+  (req, res) => {
+    const userId = req.user.id;
+    database.clients.fetch(userId, (error, clients) => {
+      if (error || !clients) {
+        return res.sendStatus(500);
+      }
+      return res.json(clients);
+    });
+  });
+
 router.get('/key',
   ensureLoggedIn('/login'),
   (req, res) => {

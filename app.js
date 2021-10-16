@@ -5,19 +5,36 @@ require('dotenv').config();
 const express = require('express'),
   cors = require('cors'),
   session = require('express-session'),
+  redis = require('redis'),
   RedisStore = require('connect-redis')(session),
   passport = require('passport');
-
-
-const database = require('./database');
 
 const app = express();
 
 app.set('trust proxy', 1);
 
+var redisClient;
+if (process.env.REDIS_TLS_URL || process.env.REDIS_URL) {
+  redisClient = redis.createClient(process.env.REDIS_TLS_URL ?? process.env.REDIS_URL,
+    {
+      tls: {
+        rejectUnauthorized: process.env.REDIS_SELF_SIGNED !== 'true'
+      },
+      db: 1
+    });
+} else {
+  redisClient = redis.createClient({
+    host: process.env.REDIS_HOST ?? "localhost",
+    port: process.env.REDIS_PORT ?? 6379,
+    password: process.env.REDIS_KEY,
+    db: 1
+  });
+}
+redisClient.on('error', console.error);
+
 const sessionMiddleware = session({
   store: new RedisStore({
-    client: database.redisClient,
+    client: redisClient,
     prefix: 'sessions:',
     disableTouch: false
   }),

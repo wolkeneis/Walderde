@@ -23,8 +23,11 @@ function verifyClient(clientId, clientSecret, done) {
   database.clients.byId(clientId, (error, client) => {
     if (error) return done(error);
     if (!client) return done(null, false);
-    if (client.secret !== clientSecret) return done(null, false);
-    return done(null, client);
+    database.clients.checkSecret(clientId, clientSecret, (error, match) => {
+      if (error) return done(error);
+      if (!match) return done(null, false);
+      return done(null, client);
+    });
   });
 }
 

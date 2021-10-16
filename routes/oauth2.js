@@ -14,15 +14,16 @@ router.get('/authorize',
   server.authorization((clientId, redirectUri, done) => {
     database.clients.byId(clientId, (error, client) => {
       if (error) return done(error);
-      // WARNING: For security purposes, it is highly advisable to check that
-      //          redirectUri provided by the client matches one registered with
-      //          the server. For simplicity, this example does not. You have
-      //          been warned.
-      return done(null, client, redirectUri);
+      if (client.redirectUri === redirectUri) {
+        return done(null, client, redirectUri);
+      } else {
+        return done(new Error("Redirect URIs do not match"));
+      }
     });
   }, (client, user, done) => {
     if (client.trusted === 'true') return done(null, true);
     database.accessTokens.findByIds(user.id, client.id, (error, token) => {
+      if (error) return done(error);
       if (token) return done(null, true);
       return done(null, false);
     });

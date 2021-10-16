@@ -1,14 +1,53 @@
 'use strict';
 
 const redis = require('redis'),
-  uuid = require('uuid');
+  uuid = require('uuid'),
+  crypto = require('crypto'),
+  argon2 = require('argon2');
 
-const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST ?? "localhost",
-  port: process.env.REDIS_PORT ?? 6379,
-  password: process.env.REDIS_KEY
-});
+var redisClient;
+
+if (process.env.REDIS_TLS_URL || process.env.REDIS_URL) {
+  redisClient = redis.createClient(process.env.REDIS_TLS_URL ?? process.env.REDIS_URL,
+    {
+      tls: {
+        rejectUnauthorized: process.env.REDIS_SELF_SIGNED !== 'true'
+      }
+    });
+} else {
+  redisClient = redis.createClient({
+    host: process.env.REDIS_HOST ?? "localhost",
+    port: process.env.REDIS_PORT ?? 6379,
+    password: process.env.REDIS_KEY
+  });
+}
 redisClient.on('error', console.error);
+
+function randomToken(length) {
+  return crypto.randomBytes(length).toString('hex');
+}
+
+function isValidUrl(string) {
+  let url;
+  try {
+    url = new URL(string);
+  } catch {
+    return false;
+  }
+  return url.protocol === "http:" || url.protocol === "https:";
+}
+
+function wrapCall(func, database) {
+  return (...args) => {
+    redisClient.select(database, (error) => {
+      if (error) {
+        console.error(error);
+        throw new Error('Database error');
+      }
+      func(...args);
+    });
+  }
+}
 
 function clientById(clientId, done) {
   redisClient.hgetall('client:' + clientId, (error, client) => {
@@ -20,6 +59,135 @@ function clientById(clientId, done) {
       return done(new Error('Client not found'));
     }
     return done(null, client);
+  });
+}
+
+function clientsFetch(userId, done) {
+  redisClient.smembers('clients:' + userId, (error, clients) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    return done(null, clients);
+  });
+}
+
+function clientCreate(userId, name, redirectUri, done) {
+  if (!isValidUrl(redirectUri)) {
+    return done(new Error('Invalid Redirect Uri'));
+  }
+  redisClient.scard('clients:' + userId, (error, length) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    if (length >= 2) {
+      return done(new Error('Maximum number of clients reached'));
+    }
+    const clientId = uuid.v4();
+    const token = randomToken(256);
+    argon2.hash(token, {
+      type: argon2.argon2id,
+      timeCost: 2, //Iterations
+      memoryCost: 16384, //Memory Size
+      parallelism: 1 //Threads
+    }).then(hashedToken => {
+      const client = [
+        'id', clientId,
+        'name', name,
+        'trusted', false,
+        'redirectUri', redirectUri,
+        'secret', hashedToken,
+        'owner', userId
+      ];
+      redisClient.multi()
+        .sadd('clients:' + userId, clientId)
+        .hset('client:' + clientId, client).exec(error => {
+          if (error) {
+            console.error(error);
+            return done(new Error('Database error'));
+          }
+          return done(null, {
+            id: clientId,
+            secret: token
+          });
+        });
+    });
+  });
+}
+
+function clientUpdateName(clientId, name, done) {
+  if (!clientId || !uuid.validate(clientId)) {
+    return done(new Error('Invalid Client Id'));
+  }
+  redisClient.hset('client:' + clientId, [
+    'name', name
+  ], (error) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    return done();
+  });
+}
+
+function clientUpdateRedirectUri(clientId, redirectUri, done) {
+  if (!clientId || !uuid.validate(clientId)) {
+    return done(new Error('Invalid Client Id'));
+  }
+  if (!isValidUrl(redirectUri)) {
+    return done(new Error('Invalid Redirect Uri'));
+  }
+  redisClient.hset('client:' + clientId, [
+    'redirectUri', redirectUri
+  ], (error) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    return done();
+  });
+}
+
+function clientRegenerateSecret(clientId, done) {
+  if (!clientId || !uuid.validate(clientId)) {
+    return done(new Error('Invalid Client Id'));
+  }
+  const token = randomToken(256);
+  argon2.hash(token, {
+    type: argon2.argon2id,
+    timeCost: 2, //Iterations
+    memoryCost: 16384, //Memory Size
+    parallelism: 1 //Threads
+  }).then(hashedToken => {
+    redisClient.hset('client:' + clientId, [
+      'secret', hashedToken
+    ], error => {
+      if (error) {
+        console.error(error);
+        return done(new Error('Database error'));
+      }
+      return done(null, {
+        id: clientId,
+        secret: token
+      });
+    });
+  });
+}
+
+function clientCheckSecret(clientId, secret, done) {
+  redisClient.hgetall('client:' + clientId, (error, client) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    if (!client) {
+      return done(new Error('Client not found'));
+    }
+    argon2.verify(client.secret, secret)
+      .then(successful => {
+        done(null, successful);
+      });
   });
 }
 
@@ -454,9 +622,6 @@ function accessTokenFindByIds(userId, clientId, done) {
       console.error(error);
       return done(new Error('Database error'));
     }
-    if (!accessToken) {
-      return done(new Error('Access token invalid'));
-    }
     return done(null, accessToken);
   });
 }
@@ -531,9 +696,6 @@ function refreshTokenFindByIds(userId, clientId, done) {
       console.error(error);
       return done(new Error('Database error'));
     }
-    if (!refreshToken) {
-      return done(new Error('Refresh token invalid'));
-    }
     return done(null, refreshToken);
   });
 }
@@ -591,40 +753,46 @@ function refreshTokenRemoveByIds(refreshToken, userId, clientId, done) {
 module.exports = {
   redisClient: redisClient,
   clients: {
-    byId: clientById
+    byId: wrapCall(clientById, 4),
+    fetch: wrapCall(clientsFetch, 4),
+    create: wrapCall(clientCreate, 4),
+    updateName: wrapCall(clientUpdateName, 4),
+    updateRedirectUri: wrapCall(clientUpdateRedirectUri, 4),
+    regenerateSecret: wrapCall(clientRegenerateSecret, 4),
+    checkSecret: wrapCall(clientCheckSecret, 4)
   },
   users: {
-    byId: userById,
-    findOrCreate: userFindOrCreate,
-    changePrivacy: userChangePrivacy,
-    fetchConnections: userFetchConnections,
-    fetchContacts: userFetchContacts,
-    addContact: userAddContact,
-    isContact: userIsContact,
-    removeContact: userRemoveContact
+    byId: wrapCall(userById, 0),
+    findOrCreate: wrapCall(userFindOrCreate, 0),
+    changePrivacy: wrapCall(userChangePrivacy, 0),
+    fetchConnections: wrapCall(userFetchConnections, 0),
+    fetchContacts: wrapCall(userFetchContacts, 0),
+    addContact: wrapCall(userAddContact, 0),
+    isContact: wrapCall(userIsContact, 0),
+    removeContact: wrapCall(userRemoveContact, 0)
   },
   chat: {
-    fetchPackets: chatFetchPackets,
-    storePacket: chatStorePacket
+    fetchPackets: wrapCall(chatFetchPackets, 3),
+    storePacket: wrapCall(chatStorePacket, 3)
   },
   keyPairs: {
-    find: keyPairFind,
-    save: keyPairSave
+    find: wrapCall(keyPairFind, 0),
+    save: wrapCall(keyPairSave, 0)
   },
   authorizationCodes: {
-    find: authorizationCodeFind,
-    save: authorizationCodeSave
+    find: wrapCall(authorizationCodeFind, 2),
+    save: wrapCall(authorizationCodeSave, 2)
   },
   accessTokens: {
-    find: accessTokenFind,
-    findByIds: accessTokenFindByIds,
-    save: accessTokenSave,
-    removeByIds: accessTokenRemoveByIds,
+    find: wrapCall(accessTokenFind, 2),
+    findByIds: wrapCall(accessTokenFindByIds, 2),
+    save: wrapCall(accessTokenSave, 2),
+    removeByIds: wrapCall(accessTokenRemoveByIds, 2)
   },
   refreshTokens: {
-    find: refreshTokenFind,
-    findByIds: refreshTokenFindByIds,
-    save: refreshTokenSave,
-    removeByIds: refreshTokenRemoveByIds,
+    find: wrapCall(refreshTokenFind, 2),
+    findByIds: wrapCall(refreshTokenFindByIds, 2),
+    save: wrapCall(refreshTokenSave, 2),
+    removeByIds: wrapCall(refreshTokenRemoveByIds, 2)
   }
 };
