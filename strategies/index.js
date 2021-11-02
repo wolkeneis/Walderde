@@ -6,8 +6,9 @@ const BasicStrategy = require('passport-http').BasicStrategy;
 const ClientPasswordStrategy = require('passport-oauth2-client-password').Strategy;
 const BearerStrategy = require('passport-http-bearer').Strategy;
 
-var DiscordStrategy = require('passport-discord').Strategy;
-var GitHubStrategy = require('passport-github2').Strategy;
+const DiscordStrategy = require('passport-discord').Strategy;
+const GitHubStrategy = require('passport-github2').Strategy;
+const SpotifyStrategy = require('passport-spotify').Strategy;
 
 const database = require('../database');
 
@@ -65,7 +66,7 @@ passport.use(new DiscordStrategy({
     provider: profile.provider,
     providerId: profile.id,
     username: profile.username + '#' + profile.discriminator,
-    avatar: `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`,
+    avatar: profile.avatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png` : 'null',
     accessToken: accessToken,
     refreshToken: refreshToken
   }, (error, user) => {
@@ -84,7 +85,27 @@ passport.use(new GitHubStrategy({
     provider: profile.provider,
     providerId: profile.id,
     username: profile.username,
-    avatar: profile.photos[0].value,
+    avatar: profile.photos[0] ? profile.photos[0].value : 'null',
+    accessToken: accessToken,
+    refreshToken: refreshToken
+  }, (error, user) => {
+    return done(error, user);
+  });
+}));
+
+
+passport.use(new SpotifyStrategy({
+  clientID: process.env.SPOTIFY_CLIENT_ID,
+  clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+  callbackURL: process.env.SPOTIFY_CALLBACK_URL,
+  passReqToCallback: true
+}, (req, accessToken, refreshToken, expires_in, profile, done) => {
+  database.users.findOrCreate({
+    user: req.user,
+    provider: profile.provider,
+    providerId: profile.id,
+    username: profile.displayName,
+    avatar: profile.photos[0] ? profile.photos[0].value : 'null',
     accessToken: accessToken,
     refreshToken: refreshToken
   }, (error, user) => {

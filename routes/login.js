@@ -23,4 +23,10 @@ router.get('/github/callback', passport.authenticate('github', {
   failureRedirect: "/login",
 }));
 
+router.get('/spotify', passport.authenticate('spotify', { scope: ['user-read-private'] }));
+router.get('/spotify/callback', passport.authenticate('spotify', {
+  successReturnToOrRedirect: '/profile',
+  failureRedirect: "/login",
+}));
+
 module.exports = router;
