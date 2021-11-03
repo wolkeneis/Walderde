@@ -29,4 +29,10 @@ router.get('/spotify/callback', passport.authenticate('spotify', {
   failureRedirect: "/login",
 }));
 
+router.get('/twitter', passport.authenticate('twitter'));
+router.get('/twitter/callback', passport.authenticate('twitter', {
+  successReturnToOrRedirect: '/profile',
+  failureRedirect: "/login",
+}));
+
 module.exports = router;

@@ -9,6 +9,7 @@ const BearerStrategy = require('passport-http-bearer').Strategy;
 const DiscordStrategy = require('passport-discord').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
 const SpotifyStrategy = require('passport-spotify').Strategy;
+const TwitterStrategy = require('passport-twitter').Strategy;
 
 const database = require('../database');
 
@@ -108,6 +109,28 @@ passport.use(new SpotifyStrategy({
     avatar: profile.photos[0] ? profile.photos[0].value : 'null',
     accessToken: accessToken,
     refreshToken: refreshToken
+  }, (error, user) => {
+    return done(error, user);
+  });
+}));
+
+
+passport.use(new TwitterStrategy({
+  consumerKey: process.env.TWITTER_CONSUMER_KEY,
+  consumerSecret: process.env.TWITTER_CONSUMER_SECRET,
+  callbackURL: process.env.TWITTER_CALLBACK_URL,
+  passReqToCallback: true
+}, (req, token, tokenSecret, profile, done) => {
+  console.log(token);
+  console.log(tokenSecret);
+  console.log(profile);
+  database.users.findOrCreate({
+    user: req.user,
+    provider: profile.provider,
+    providerId: profile.id,
+    username: profile.username,
+    avatar: profile.photos[0] ? profile.photos[0].value : 'null',
+    accessToken: `${token}/${tokenSecret}`,
   }, (error, user) => {
     return done(error, user);
   });
