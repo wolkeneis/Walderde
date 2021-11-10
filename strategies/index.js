@@ -121,9 +121,6 @@ passport.use(new TwitterStrategy({
   callbackURL: process.env.TWITTER_CALLBACK_URL,
   passReqToCallback: true
 }, (req, token, tokenSecret, profile, done) => {
-  console.log(token);
-  console.log(tokenSecret);
-  console.log(profile);
   database.users.findOrCreate({
     user: req.user,
     provider: profile.provider,
