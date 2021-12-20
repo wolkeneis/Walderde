@@ -38,7 +38,7 @@ function isValidUrl(string) {
 }
 
 function wrapCall(func, database, fallbackDatabase) {
-  
+
   return (...args) => {
     redisClient.select(process.env.REDIS_DATABASES ? (process.env.REDIS_DATABASES !== 'min' ? (process.env.REDIS_DATABASES === 'max' ? database : fallbackDatabase) : 0) : 0, (error) => {
       if (error) {
@@ -545,6 +545,16 @@ function chatStorePacket(userId, packet, done) {
     });
 }
 
+function chatFetchRange(userId, done) {
+  redisClient.llen('packets:' + userId, (error, length) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    return done(null, length);
+  });
+}
+
 function keyPairFind(userId, done) {
   redisClient.hgetall('keyPair:' + userId, (error, keyPair) => {
     if (error) {
@@ -574,6 +584,21 @@ function keyPairSave(userId, keyPair, done) {
       }
       return done();
     });
+}
+
+function keyPairSavePublicKey(userId, keyPair, done) {
+  if (keyPair.publicKey > 64) {
+    return done(new Error('Invalid Key'));
+  }
+  redisClient.hset('user:' + userId, [
+    'publicKey', keyPair.publicKey
+  ], (error) => {
+    if (error) {
+      console.error(error);
+      return done(new Error('Database error'));
+    }
+    return done();
+  });
 }
 
 function authorizationCodeFind(code, done) {
@@ -774,11 +799,13 @@ module.exports = {
   },
   chat: {
     fetchPackets: wrapCall(chatFetchPackets, 3, 1),
-    storePacket: wrapCall(chatStorePacket, 3, 1)
+    storePacket: wrapCall(chatStorePacket, 3, 1),
+    fetchRange: wrapCall(chatFetchRange, 3, 1)
   },
   keyPairs: {
     find: wrapCall(keyPairFind, 0, 0),
-    save: wrapCall(keyPairSave, 0, 0)
+    save: wrapCall(keyPairSave, 0, 0),
+    savePublicKey: wrapCall(keyPairSavePublicKey, 0, 0)
   },
   authorizationCodes: {
     find: wrapCall(authorizationCodeFind, 2, 1),

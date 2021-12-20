@@ -54,10 +54,9 @@ const passportMiddleware = passport.initialize();
 const passportSessionMiddleware = passport.session();
 
 const whitelist = [
-  process.env.CONTROL_ORIGIN ?? 'https://eiswald.wolkeneis.dev',
-  process.env.CONTROL_ORIGIN_ELECTRON ?? 'eiswald://-',
-  process.env.CONTROL_ORIGIN_IOS ?? 'capacitor://localhost',
-  process.env.CONTROL_ORIGIN_ANDROID ?? 'http://localhost'
+  process.env.CONTROL_ORIGIN ?? 'https://wolkeneis.dev',
+  process.env.CONTROL_ORIGIN_2 ?? 'https://www.wolkeneis.dev',
+  process.env.CONTROL_ORIGIN_EISWALD ?? 'https://eiswald.wolkeneis.dev'
 ];
 
 app.use(cors({

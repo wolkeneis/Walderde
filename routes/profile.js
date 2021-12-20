@@ -1,7 +1,6 @@
 'use strict';
 
 const express = require('express'),
-  { ensureLoggedIn } = require('connect-ensure-login'),
   uuid = require('uuid');
 
 const database = require('../database');
@@ -15,7 +14,7 @@ router.get('/', (req, res) => {
 });
 
 router.post('/',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const user = req.user;
     res.json({
@@ -27,7 +26,7 @@ router.post('/',
   });
 
 router.post('/privacy',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const user = req.user;
     if (req.body && req.body.private !== undefined) {
@@ -44,8 +43,8 @@ router.post('/privacy',
     }
   });
 
-router.get('/contacts',
-  ensureLoggedIn('/login'),
+router.post('/contacts',
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     database.users.fetchContacts(userId, (error, contacts) => {
@@ -57,7 +56,7 @@ router.get('/contacts',
   });
 
 router.post('/addcontact',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     if (req.body && req.body.contactId !== undefined && uuid.validate(req.body.contactId)) {
@@ -97,7 +96,7 @@ router.post('/addcontact',
   });
 
 router.post('/removecontact',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     if (req.body && req.body.contactId !== undefined && uuid.validate(req.body.contactId)) {
@@ -123,7 +122,7 @@ router.post('/removecontact',
   });
 
 router.post('/connections',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const user = req.user;
     database.users.fetchConnections(user.id, (error, connections) => {
@@ -140,8 +139,8 @@ router.post('/connections',
     });
   });
 
-router.get('/clients',
-  ensureLoggedIn('/login'),
+router.post('/clients',
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     database.clients.fetch(userId, (error, clients) => {
@@ -153,7 +152,7 @@ router.get('/clients',
   });
 
 router.get('/key',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const user = req.user;
     database.keyPairs.find(user.id, (error, keyPair) => {
@@ -170,7 +169,7 @@ router.get('/key',
   });
 
 router.post('/key',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const user = req.user;
     if (req.body && req.body.iv && req.body.salt && req.body.privateKey && req.body.publicKey) {
@@ -178,6 +177,15 @@ router.post('/key',
         iv: req.body.iv,
         salt: req.body.salt,
         privateKey: req.body.privateKey,
+        publicKey: req.body.publicKey
+      }, (error) => {
+        if (error) {
+          return res.sendStatus(500);
+        }
+        return res.sendStatus(204);
+      });
+    } else if (req.body && !req.body.iv && !req.body.salt && !req.body.privateKey && req.body.publicKey) {
+      database.keyPairs.savePublicKey(user.id, {
         publicKey: req.body.publicKey
       }, (error) => {
         if (error) {
@@ -196,8 +204,12 @@ router.all('/logout',
     res.redirect(process.env.CONTROL_ORIGIN + '/redirect/profile');
   });
 
-router.get('/client', (req, res) => {
-  res.sendStatus(200);
-});
+function ensureLoggedIn(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  } else {
+    return res.sendStatus(401);
+  }
+}
 
 module.exports = router;

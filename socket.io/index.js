@@ -18,10 +18,9 @@ function initalize(server) {
     throw new Error('socket.io needs a valid session middleware');
   }
   const whitelist = [
-    process.env.CONTROL_ORIGIN ?? 'https://eiswald.wolkeneis.dev',
-    process.env.CONTROL_ORIGIN_ELECTRON ?? 'eiswald://-',
-    process.env.CONTROL_ORIGIN_IOS ?? 'capacitor://localhost',
-    process.env.CONTROL_ORIGIN_ANDROID ?? 'http://localhost'
+    process.env.CONTROL_ORIGIN ?? 'https://wolkeneis.dev',
+    process.env.CONTROL_ORIGIN_2 ?? 'https://www.wolkeneis.dev',
+    process.env.CONTROL_ORIGIN_EISWALD ?? 'https://eiswald.wolkeneis.dev',
   ];
   const io = new Server(server, {
     cors: {
@@ -114,6 +113,17 @@ function initalize(server) {
             return callback(error ? undefined : packets);
           });
         }
+      }
+    });
+
+    socket.on('range', (data, callback) => {
+      if (callback) {
+        if (!user) {
+          return callback();
+        }
+        database.chat.fetchRange(user.id, (error, range) => {
+          return callback(error ? undefined : range);
+        });
       }
     });
   });

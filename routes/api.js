@@ -2,15 +2,14 @@
 
 const uuid = require('uuid'),
   express = require('express'),
-  passport = require('passport'),
-  { ensureLoggedIn } = require('connect-ensure-login');
+  passport = require('passport');
 
 const database = require('../database');
 
 const router = express.Router();
 
 router.post('/client/create',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     if (!req.body || !req.body.name || !req.body.redirectUri) {
@@ -27,8 +26,8 @@ router.post('/client/create',
     });
   });
 
-router.get('/client/:clientId',
-  ensureLoggedIn('/login'),
+router.post('/client/:clientId',
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     if (!req.params || !req.params.clientId || !uuid.validate(req.params.clientId)) {
@@ -52,7 +51,7 @@ router.get('/client/:clientId',
   });
 
 router.post('/client/:clientId/name',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     if (!req.params || !req.params.clientId || !uuid.validate(req.params.clientId) || !req.body || !req.body.name) {
@@ -77,7 +76,7 @@ router.post('/client/:clientId/name',
   });
 
 router.post('/client/:clientId/redirectUri',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     if (!req.params || !req.params.clientId || !uuid.validate(req.params.clientId) || !req.body || !req.body.redirectUri) {
@@ -102,7 +101,7 @@ router.post('/client/:clientId/redirectUri',
   });
 
 router.post('/client/:clientId/secret',
-  ensureLoggedIn('/login'),
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     if (!req.params || !req.params.clientId || !uuid.validate(req.params.clientId)) {
@@ -142,8 +141,8 @@ router.get('/user/profile',
     });
   });
 
-router.get('/user/:userId/profile',
-  ensureLoggedIn('/login'),
+router.post('/user/:userId/profile',
+  ensureLoggedIn,
   (req, res) => {
     const userId = req.user.id;
     if (req.params.userId && uuid.validate(req.params.userId)) {
@@ -183,5 +182,13 @@ router.get('/user/:userId/profile',
       res.sendStatus(400);
     }
   });
+
+function ensureLoggedIn(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  } else {
+    return res.sendStatus(401);
+  }
+}
 
 module.exports = router;
