@@ -22,7 +22,7 @@
     "connect-ensure-login": "^0.1.1",
     "connect-redis": "^6.0.0",
     "cors": "^2.8.5",
-    "dotenv": "^10.0.0",
+    "dotenv": "^15.0.1",
     "express": "^4.17.1",
     "express-session": "^1.17.2",
     "oauth2orize": "^1.11.0",
@@ -35,7 +35,7 @@
     "passport-spotify": "^2.0.0",
     "passport-twitter": "^1.0.4",
     "redis": "^3.1.2",
-    "socket.io": "4.4.0",
+    "socket.io": "4.4.1",
     "uuid": "^8.3.2"
   }
 }
